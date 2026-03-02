@@ -1,142 +1,149 @@
-# FundNest (Guided Build)
+# FundNest
 
-We will build this in small steps.
+Multi-tenant donation platform (portfolio project) built to demonstrate backend architecture, tenant isolation, payments integration, and cloud-ready deployment workflows.
 
-## Why These Files Exist
-- `apps/api`: Express backend
-- `apps/web`: Vue frontend
-- `packages/shared`: shared types/constants
-- `docs`: architecture and setup notes
-- `docker-compose.yml`: starts database + API + web together
-- `.env`: local settings (passwords/ports), created from `.env.example`
-- `apps/api/sql/001_init.sql`: creates database tables and constraints
-- `apps/api/sql/002_seed.sql`: inserts one demo tenant/admin/donations
+## Overview
 
-## Current Step
-- Step 8 complete: public tenant lookup + donation intent API
+FundNest supports multiple charities (tenants) on one shared platform:
+- Public tenant donation pages by slug
+- Tenant-scoped admin access with JWT auth
+- SQL Server persistence with strict tenant filtering
+- Stripe PaymentIntent integration (test mode)
 
-## Daily Start/Stop (Beginner Flow)
-1. Start:
-   - `docker compose up -d --build`
-2. Check:
-   - `docker compose ps`
-3. Stop when done:
-   - `docker compose down`
+Current status:
+- Public tenant lookup and donation intent creation are implemented
+- Admin donation/config APIs are implemented with tenant isolation
+- Stripe webhook processing and platform-admin tenant creation are pending
 
-## First-Time Setup
-1. Copy env template:
-   - PowerShell: `Copy-Item .env.example .env`
-2. Start containers:
-   - `docker compose up -d --build`
-3. Check status:
-   - `docker compose ps`
+## Architecture
 
-Expected containers:
-- `fundnest-sqlserver` (real SQL Server)
-- `fundnest-api` (real Express API)
-- `fundnest-web` (real Vue app)
+- Frontend: Vue 3 + Vue Router (`apps/web`)
+- Backend: Node.js + Express (`apps/api`)
+- Database: SQL Server (`sqlserver` container)
+- Payments: Stripe PaymentIntent (or optional local demo provider)
+- Auth: JWT with `tenantId` and role claims
+- Runtime: Docker Compose
 
-Note:
-- API is implemented with `GET /api/health`.
-- Web is implemented with Vue + Vue Router.
-- We intentionally do not bind-mount source into containers right now.
-- After code changes, rerun `docker compose up -d --build`.
-- SQL Server memory is capped to `2048 MB` in compose for lighter local usage.
+Tenant isolation model:
+1. Admin JWT includes `tenantId`
+2. Middleware enforces auth + role + tenant scope
+3. Every admin DB query filters by `tenantId`
+4. Public endpoints resolve tenant from slug
 
-## Step 3: Verify API
-1. Start:
-   - `docker compose up -d --build`
-2. Test API health:
-   - Open `http://localhost:3000/api/health`
-3. Optional test run on host:
-   - `npm install`
-   - `npm run test:api`
+## Repository Layout
 
-## Step 4: Verify Web
-1. Start:
-   - `docker compose up -d --build`
-2. Open the web app:
-   - `http://localhost:5173`
-3. Check routes:
-   - `http://localhost:5173/`
-   - `http://localhost:5173/c/demo-charity`
-   - `http://localhost:5173/admin`
+```text
+apps/
+  api/        Express API, SQL scripts, tests
+  web/        Vue app
+docs/         Architecture and design notes
+docker-compose.yml
+```
 
-## Step 5: Create Schema + Seed Data
-1. Ensure DB container is running:
-   - `docker compose up -d sqlserver`
-2. Apply schema + seed scripts:
-   - `docker compose --profile tools run --rm db-init`
-3. Optional: run full stack after seeding:
-   - `docker compose up -d --build`
+## Prerequisites
 
-Seeded demo data:
+- Docker Desktop (or Docker Engine + Compose)
+- Node.js 20+ (for local test commands)
+
+## Quick Start
+
+1. Create local env:
+```powershell
+Copy-Item .env.example .env
+```
+
+2. Set required values in `.env`:
+- `JWT_SECRET`
+- `STRIPE_SECRET_KEY` (test mode key, `sk_test_...`)
+
+3. Start stack:
+```powershell
+docker compose up -d --build
+```
+
+4. Initialize database schema + seed data:
+```powershell
+docker compose --profile tools run --rm db-init
+```
+
+5. Verify services:
+- API health: `http://localhost:3000/api/health`
+- Web app: `http://localhost:5173`
+
+## Environment Variables
+
+Core values in `.env`:
+- `SQL_SA_PASSWORD`
+- `SQL_DATABASE`
+- `JWT_SECRET`
+- `JWT_EXPIRES_IN`
+- `PAYMENTS_MODE` (`stripe` or `demo`)
+- `STRIPE_SECRET_KEY`
+
+Notes:
+- Default payment mode is `stripe` (test mode expected)
+- `demo` mode is available for offline payment-flow demos
+
+## Seeded Demo Credentials
+
 - Tenant slug: `demo-charity`
 - Admin email: `admin@democharity.local`
 - Admin password: `DemoAdmin123!`
-- Sample donations: 2 rows
 
-## Step 6: JWT Auth + Tenant Scope
-1. Re-apply seed (adds hashed demo password):
-   - `docker compose up -d sqlserver`
-   - `docker compose --profile tools run --rm db-init`
-2. Rebuild API:
-   - `docker compose up -d --build api`
-3. Login (PowerShell):
-   - `Invoke-RestMethod -Method Post -Uri http://localhost:3000/api/auth/login -ContentType 'application/json' -Body '{\"tenantSlug\":\"demo-charity\",\"email\":\"admin@democharity.local\",\"password\":\"DemoAdmin123!\"}'`
-4. Copy `accessToken` from response and call protected endpoint:
-   - `Invoke-RestMethod -Uri http://localhost:3000/api/admin/me -Headers @{ Authorization = \"Bearer <PASTE_TOKEN>\" }`
+## API Surface (Current)
 
-Expected:
-- Login returns JWT token + user object
-- `/api/admin/me` returns tenant-bound claims and donation count
-
-## Step 7: Admin APIs
-New endpoints:
-- `GET /api/admin/donations`
-- `PATCH /api/admin/config`
-
-Both require:
-- `Authorization: Bearer <accessToken>`
-- `role = tenant_admin`
-- tenant isolation via `tenantId` from JWT claim
-
-PowerShell verification:
-1. Login and store token:
-   - `$body = @{ tenantSlug = 'demo-charity'; email = 'admin@democharity.local'; password = 'DemoAdmin123!' } | ConvertTo-Json`
-   - `$login = Invoke-RestMethod -Method Post -Uri http://localhost:3000/api/auth/login -ContentType 'application/json' -Body $body`
-   - `$token = $login.accessToken`
-2. Get tenant donations:
-   - `Invoke-RestMethod -Uri http://localhost:3000/api/admin/donations -Headers @{ Authorization = \"Bearer $token\" } | ConvertTo-Json -Depth 8`
-3. Update tenant config:
-   - `$patch = @{ brandColor = '#1e88e5'; currency = 'GBP'; donationPresets = @(1000,2500,5000) } | ConvertTo-Json`
-   - `Invoke-RestMethod -Method Patch -Uri http://localhost:3000/api/admin/config -ContentType 'application/json' -Headers @{ Authorization = \"Bearer $token\" } -Body $patch | ConvertTo-Json -Depth 8`
-
-## Step 8: Public Tenant + Donation Endpoints
-New endpoints:
+Public:
 - `GET /api/public/tenants/:slug`
 - `POST /api/public/donations`
 
-Behavior:
-- Tenant endpoint returns tenant + branding/config by slug.
-- Donation endpoint creates a payment intent and stores a `Pending` donation.
-- Default mode is `stripe` (Stripe test mode recommended for portfolio).
+Auth:
+- `POST /api/auth/login`
 
-PowerShell verification:
-1. Tenant lookup:
-   - `Invoke-RestMethod -Uri http://localhost:3000/api/public/tenants/demo-charity | ConvertTo-Json -Depth 8`
-2. Donation creation (Stripe mode):
-   - Ensure `.env` has `PAYMENTS_MODE=stripe`
-   - Set `STRIPE_SECRET_KEY=sk_test_...`
-   - Rebuild API: `docker compose up -d --build api`
-   - `$donation = @{ tenantSlug = 'demo-charity'; amountMinor = 2500; donorEmail = 'donor@example.com' } | ConvertTo-Json`
-   - `Invoke-RestMethod -Method Post -Uri http://localhost:3000/api/public/donations -ContentType 'application/json' -Body $donation | ConvertTo-Json -Depth 8`
-3. Optional demo fallback (no Stripe account):
-   - Set `.env` value: `PAYMENTS_MODE=demo`
-   - Rebuild API: `docker compose up -d --build api`
+Tenant Admin (JWT required):
+- `GET /api/admin/me`
+- `GET /api/admin/donations`
+- `PATCH /api/admin/config`
 
-Expected donation response:
-- `status = Pending`
-- `stripePaymentIntentId`
-- `clientSecret`
-- `paymentProvider` (`demo` or `stripe`)
+System:
+- `GET /api/health`
+
+## Testing
+
+Run API tests:
+```powershell
+npm run test:api
+```
+
+Test coverage currently includes:
+- health endpoint smoke tests
+- JWT helper tests
+- auth guard tests
+- public payload validation tests
+- payment provider demo-path tests
+
+## Development Workflow
+
+Typical cycle:
+1. Update code
+2. Rebuild changed service
+```powershell
+docker compose up -d --build api
+```
+3. Run tests
+```powershell
+npm run test:api
+```
+
+Stop stack:
+```powershell
+docker compose down
+```
+
+## Roadmap
+
+Pending MVP work:
+- Stripe webhook handler (`/api/webhooks/stripe`) with signature verification and idempotency
+- Platform admin tenant creation endpoint (`/api/platform/tenants`)
+- Frontend integration for login, admin dashboard data, and payment confirmation flow
+- CI/CD and cloud deployment hardening
+
