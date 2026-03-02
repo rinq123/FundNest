@@ -172,3 +172,32 @@ Idempotency behavior:
 Config requirements:
 - `STRIPE_SECRET_KEY` for Stripe API client
 - `STRIPE_WEBHOOK_SECRET` for webhook signature verification
+
+## Step 10: Frontend Integration
+
+Implemented in `apps/web`:
+- Shared API client for browser requests with optional bearer token support
+- Public tenant page (`/c/:slug`) that:
+  - fetches tenant branding/config
+  - creates donation intents through backend API
+  - shows PaymentIntent/client-secret response metadata
+- Admin dashboard (`/admin`) that:
+  - authenticates with `/api/auth/login`
+  - stores JWT session in browser `localStorage`
+  - loads tenant profile and donation list
+  - updates tenant branding/config
+
+API runtime updates for browser integration:
+- CORS enabled on API service so web app (`localhost:5173`) can call API (`localhost:3000`)
+
+## Step 11: Platform Admin Endpoint
+
+Implemented in API:
+- `POST /api/platform/tenants`
+  - Guarded by `x-platform-secret` header
+  - Validates `name` and `slug`
+  - Creates tenant row + default tenant config row
+
+Remaining work after Step 11:
+- Production UI hardening and full Stripe Checkout/Elements UX
+- CI/CD pipeline and deployment automation

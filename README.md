@@ -14,7 +14,8 @@ Current status:
 - Public tenant lookup and donation intent creation are implemented
 - Admin donation/config APIs are implemented with tenant isolation
 - Stripe webhook processing is implemented
-- Platform-admin tenant creation is pending
+- Frontend is integrated with live API for tenant and admin flows
+- Platform-admin tenant creation is implemented
 
 ## Architecture
 
@@ -39,6 +40,7 @@ apps/
   web/        Vue app
 docs/         Architecture and design notes
 docker-compose.yml
+apps/web/.env.example
 ```
 
 ## Prerequisites
@@ -56,6 +58,7 @@ Copy-Item .env.example .env
 2. Set required values in `.env`:
 - `JWT_SECRET`
 - `STRIPE_SECRET_KEY` (test mode key, `sk_test_...`)
+- `STRIPE_WEBHOOK_SECRET` (from `stripe listen` output)
 
 3. Start stack:
 ```powershell
@@ -78,8 +81,10 @@ Core values in `.env`:
 - `SQL_DATABASE`
 - `JWT_SECRET`
 - `JWT_EXPIRES_IN`
+- `PLATFORM_ADMIN_SECRET`
 - `PAYMENTS_MODE` (`stripe` or `demo`)
 - `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
 
 Notes:
 - Default payment mode is `stripe` (test mode expected)
@@ -108,8 +113,24 @@ Tenant Admin (JWT required):
 - `GET /api/admin/donations`
 - `PATCH /api/admin/config`
 
+Platform Admin (header `x-platform-secret` required):
+- `POST /api/platform/tenants`
+
 System:
 - `GET /api/health`
+
+## Web Features (Current)
+
+Public page (`/c/:slug`):
+- Loads tenant branding/config from API
+- Creates donation intents through `/api/public/donations`
+- Displays PaymentIntent metadata returned by API
+
+Admin page (`/admin`):
+- Authenticates via `/api/auth/login`
+- Loads tenant dashboard from `/api/admin/me` and `/api/admin/donations`
+- Updates tenant branding/config with `/api/admin/config`
+- Stores JWT session in `localStorage`
 
 ## Testing
 
@@ -146,9 +167,25 @@ docker compose down
 ## Roadmap
 
 Pending MVP work:
-- Platform admin tenant creation endpoint (`/api/platform/tenants`)
-- Frontend integration for login, admin dashboard data, and payment confirmation flow
 - CI/CD and cloud deployment hardening
+
+## End-to-End Demo Runbook
+
+1. Open `http://localhost:5173/admin` and login:
+- tenant: `demo-charity`
+- email: `admin@democharity.local`
+- password: `DemoAdmin123!`
+
+2. Open `http://localhost:5173/c/demo-charity` and create a donation intent.
+
+3. Copy returned PaymentIntent ID (`pi_...`) and confirm via Stripe CLI:
+```bash
+stripe payment_intents confirm <pi_id> --payment-method pm_card_visa
+```
+
+4. Verify status update:
+- Stripe listener should show `payment_intent.succeeded` forwarded
+- Admin donations list should show the donation status as `Paid`
 
 ## Stripe Webhook (Local)
 

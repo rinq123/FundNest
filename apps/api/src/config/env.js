@@ -11,6 +11,8 @@ export const env = {
   port: Number(process.env.PORT ?? 3000),
   jwtSecret: process.env.JWT_SECRET ?? "dev_jwt_secret_change_me",
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "2h",
+  platformAdminSecret:
+    process.env.PLATFORM_ADMIN_SECRET ?? "dev_platform_admin_secret_change_me",
   paymentsMode: rawPaymentsMode === "stripe" ? "stripe" : "demo",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
