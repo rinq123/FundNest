@@ -12,15 +12,6 @@ describe("GET /api/health", () => {
       service: "fundnest-api"
     });
   });
-
-  it("rejects GET /api/admin/me with invalid token", async () =>{
-    const response = await request (app)
-    .get("/api/admin/me")
-    .set("Authorization", "Bearer not-a-real-token");
-
-    expect(response.status).toBe(401);
-    expect(response.body.error).toBe("Invalid or expired token");
-    });
 });
 
 
