@@ -1,0 +1,64 @@
+:root {
+  color-scheme: light;
+  font-family: "Trebuchet MS", "Gill Sans", "Segoe UI", sans-serif;
+  background: #f6f7f8;
+  color: #1d242c;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.page-shell {
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(120deg, #f0ebe3, #dce6f2);
+  border-bottom: 1px solid #d3dae2;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.topbar nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.topbar a {
+  color: #1d242c;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.topbar a.router-link-active {
+  color: #0f5ca8;
+}
+
+main {
+  padding: 1.5rem;
+}
+
+.card {
+  max-width: 760px;
+  background: #ffffff;
+  border: 1px solid #d9e0e8;
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+code {
+  font-family: "Consolas", "Courier New", monospace;
+}

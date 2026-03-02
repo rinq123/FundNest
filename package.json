@@ -1,0 +1,13 @@
+{
+  "name": "fundnest",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "docker compose up --build",
+    "test:api": "npm run test --workspace @fundnest/api"
+  }
+}

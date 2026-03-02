@@ -1,0 +1,62 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: fundnest-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: ${SQL_SA_PASSWORD:-Your_strong_password123}
+      MSSQL_MEMORY_LIMIT_MB: 2048
+    ports:
+      - "1433:1433"
+    volumes:
+      - sql_data:/var/opt/mssql
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: fundnest-api
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_me}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-2h}
+      PAYMENTS_MODE: ${PAYMENTS_MODE:-stripe}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      SQL_SERVER: sqlserver
+      SQL_PORT: 1433
+      SQL_DATABASE: ${SQL_DATABASE:-FundNest}
+      SQL_USER: sa
+      SQL_PASSWORD: ${SQL_SA_PASSWORD:-Your_strong_password123}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - sqlserver
+
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    profiles: ["tools"]
+    environment:
+      SQL_SA_PASSWORD: ${SQL_SA_PASSWORD:-Your_strong_password123}
+    volumes:
+      - ./apps/api/sql:/sql:ro
+    depends_on:
+      - sqlserver
+    entrypoint: ["/bin/bash", "/sql/init-db.sh"]
+    restart: "no"
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: fundnest-web
+    environment:
+      VITE_API_BASE_URL: http://localhost:3000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  sql_data:
