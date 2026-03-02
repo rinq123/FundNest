@@ -57,6 +57,7 @@ Copy-Item .env.example .env
 
 2. Set required values in `.env`:
 - `JWT_SECRET`
+- `PLATFORM_ADMIN_SECRET`
 - `STRIPE_SECRET_KEY` (test mode key, `sk_test_...`)
 - `STRIPE_WEBHOOK_SECRET` (from `stripe listen` output)
 
