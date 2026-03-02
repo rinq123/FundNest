@@ -13,7 +13,8 @@ FundNest supports multiple charities (tenants) on one shared platform:
 Current status:
 - Public tenant lookup and donation intent creation are implemented
 - Admin donation/config APIs are implemented with tenant isolation
-- Stripe webhook processing and platform-admin tenant creation are pending
+- Stripe webhook processing is implemented
+- Platform-admin tenant creation is pending
 
 ## Architecture
 
@@ -96,6 +97,9 @@ Public:
 - `GET /api/public/tenants/:slug`
 - `POST /api/public/donations`
 
+Webhooks:
+- `POST /api/webhooks/stripe`
+
 Auth:
 - `POST /api/auth/login`
 
@@ -142,8 +146,32 @@ docker compose down
 ## Roadmap
 
 Pending MVP work:
-- Stripe webhook handler (`/api/webhooks/stripe`) with signature verification and idempotency
 - Platform admin tenant creation endpoint (`/api/platform/tenants`)
 - Frontend integration for login, admin dashboard data, and payment confirmation flow
 - CI/CD and cloud deployment hardening
 
+## Stripe Webhook (Local)
+
+1. Ensure Stripe mode and keys are configured in `.env`:
+- `PAYMENTS_MODE=stripe`
+- `STRIPE_SECRET_KEY=sk_test_...`
+
+2. Start webhook forwarding with Stripe CLI:
+```bash
+stripe listen --forward-to localhost:3000/api/webhooks/stripe
+```
+
+3. Copy generated signing secret from CLI output and set:
+```env
+STRIPE_WEBHOOK_SECRET=whsec_...
+```
+
+4. Rebuild API:
+```powershell
+docker compose up -d --build api
+```
+
+5. Trigger a test event:
+```bash
+stripe trigger payment_intent.succeeded
+```

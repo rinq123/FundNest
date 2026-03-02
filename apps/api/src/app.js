@@ -2,9 +2,11 @@ import express from "express";
 import authRoutes from "./routes/auth.js";
 import adminRoutes from "./routes/admin.js";
 import publicRoutes from "./routes/public.js";
+import webhookRoutes from "./routes/webhooks.js";
 
 const app = express();
 
+app.use("/api/webhooks", express.raw({ type: "application/json" }), webhookRoutes);
 app.use(express.json());
 
 app.get("/api/health", (_req, res) => {

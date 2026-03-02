@@ -50,5 +50,5 @@ export async function queryOne(queryText, bind = {}) {
 }
 
 export async function executeQuery(queryText, bind = {}) {
-  await runQuery(queryText, bind);
+  return runQuery(queryText, bind);
 }

@@ -23,6 +23,10 @@ export async function createPaymentIntent({ amountMinor, currency, donorEmail, m
     amount: amountMinor,
     currency: currency.toLowerCase(),
     receipt_email: donorEmail ?? undefined,
+    automatic_payment_methods: {
+      enabled: true,
+      allow_redirects: "never"
+    },
     metadata
   });
 

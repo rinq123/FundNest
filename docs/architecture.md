@@ -151,3 +151,24 @@ Operational notes:
 - Optional demo fallback uses `PAYMENTS_MODE=demo`
 - In demo mode, API returns synthetic `pi_demo_*` intent IDs and client secrets
 - Webhook status transitions (`Pending -> Paid/Failed`) are implemented in Step 9
+
+## Step 9: Stripe Webhook and Idempotency
+
+Implemented:
+- `POST /api/webhooks/stripe`
+  - Uses raw request body for Stripe signature verification
+  - Verifies `Stripe-Signature` with `STRIPE_WEBHOOK_SECRET`
+  - Maps event types to donation statuses:
+    - `payment_intent.succeeded` -> `Paid`
+    - `payment_intent.payment_failed` / `payment_intent.canceled` -> `Failed`
+
+Idempotency behavior:
+- Locates donation by `stripePaymentIntentId`
+- Ignores unsupported event types
+- Ignores duplicate event IDs
+- Updates only donations still in `Pending` state
+- Stores processed Stripe event ID in `stripeEventId`
+
+Config requirements:
+- `STRIPE_SECRET_KEY` for Stripe API client
+- `STRIPE_WEBHOOK_SECRET` for webhook signature verification

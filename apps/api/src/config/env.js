@@ -13,6 +13,7 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "2h",
   paymentsMode: rawPaymentsMode === "stripe" ? "stripe" : "demo",
   stripeSecretKey: process.env.STRIPE_SECRET_KEY ?? "",
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "",
   sql: {
     server: process.env.SQL_SERVER ?? "localhost",
     port: Number(process.env.SQL_PORT ?? 1433),
