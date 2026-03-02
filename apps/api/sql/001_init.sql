@@ -20,9 +20,17 @@ BEGIN
     tenantId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
     name NVARCHAR(200) NOT NULL,
     slug NVARCHAR(120) NOT NULL,
+    archivedAt DATETIME2 NULL,
     createdAt DATETIME2 NOT NULL CONSTRAINT DF_Tenants_CreatedAt DEFAULT SYSUTCDATETIME(),
     CONSTRAINT UQ_Tenants_Slug UNIQUE (slug)
   );
+END;
+GO
+
+IF COL_LENGTH('dbo.Tenants', 'archivedAt') IS NULL
+BEGIN
+  ALTER TABLE dbo.Tenants
+  ADD archivedAt DATETIME2 NULL;
 END;
 GO
 
@@ -45,7 +53,7 @@ IF OBJECT_ID(N'dbo.Users', N'U') IS NULL
 BEGIN
   CREATE TABLE dbo.Users (
     userId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
-    tenantId UNIQUEIDENTIFIER NOT NULL,
+    tenantId UNIQUEIDENTIFIER NULL,
     email NVARCHAR(320) NOT NULL,
     passwordHash NVARCHAR(255) NOT NULL,
     role NVARCHAR(50) NOT NULL,
@@ -55,6 +63,19 @@ BEGIN
       ON DELETE CASCADE,
     CONSTRAINT UQ_Users_Tenant_Email UNIQUE (tenantId, email)
   );
+END;
+GO
+
+IF EXISTS (
+  SELECT 1
+  FROM sys.columns
+  WHERE object_id = OBJECT_ID(N'dbo.Users')
+    AND name = 'tenantId'
+    AND is_nullable = 0
+)
+BEGIN
+  ALTER TABLE dbo.Users
+  ALTER COLUMN tenantId UNIQUEIDENTIFIER NULL;
 END;
 GO
 

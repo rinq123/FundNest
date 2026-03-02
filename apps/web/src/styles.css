@@ -84,11 +84,13 @@ h3 {
 }
 
 input,
+select,
 button {
   font: inherit;
 }
 
-input {
+input,
+select {
   padding: 0.55rem 0.65rem;
   border: 1px solid #ccd5df;
   border-radius: 8px;
@@ -123,6 +125,42 @@ input {
   gap: 0.7rem;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.actions.between {
+  justify-content: space-between;
+}
+
+.btn-sm {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.86rem;
+}
+
+.btn.danger {
+  border-color: #a11f1f;
+  background: #a11f1f;
+  color: #fff;
+}
+
+.status-active,
+.status-archived {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  border: 1px solid transparent;
+}
+
+.status-active {
+  background: #eaf8ef;
+  border-color: #9cd7ae;
+  color: #1c6f38;
+}
+
+.status-archived {
+  background: #f4f4f5;
+  border-color: #d4d4d8;
+  color: #52525b;
 }
 
 .muted {

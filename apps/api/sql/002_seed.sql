@@ -7,6 +7,7 @@ GO
 
 DECLARE @TenantId UNIQUEIDENTIFIER = '11111111-1111-1111-1111-111111111111';
 DECLARE @AdminUserId UNIQUEIDENTIFIER = '22222222-2222-2222-2222-222222222222';
+DECLARE @PlatformAdminUserId UNIQUEIDENTIFIER = '55555555-5555-5555-5555-555555555555';
 DECLARE @DonationOneId UNIQUEIDENTIFIER = '33333333-3333-3333-3333-333333333333';
 DECLARE @DonationTwoId UNIQUEIDENTIFIER = '44444444-4444-4444-4444-444444444444';
 
@@ -14,13 +15,14 @@ IF EXISTS (SELECT 1 FROM dbo.Tenants WHERE tenantId = @TenantId)
 BEGIN
   UPDATE dbo.Tenants
   SET name = N'Demo Charity',
-      slug = N'demo-charity'
+      slug = N'demo-charity',
+      archivedAt = NULL
   WHERE tenantId = @TenantId;
 END
 ELSE
 BEGIN
-  INSERT INTO dbo.Tenants (tenantId, name, slug)
-  VALUES (@TenantId, N'Demo Charity', N'demo-charity');
+  INSERT INTO dbo.Tenants (tenantId, name, slug, archivedAt)
+  VALUES (@TenantId, N'Demo Charity', N'demo-charity', NULL);
 END;
 
 IF EXISTS (SELECT 1 FROM dbo.TenantConfig WHERE tenantId = @TenantId)
@@ -56,6 +58,27 @@ BEGIN
     N'admin@democharity.local',
     N'$2a$10$lE/ziZmaQ8Egr.180SqJM.YnXKLuuW42BVUw5RcAckfsQkBjV73.a',
     N'tenant_admin'
+  );
+END;
+
+IF EXISTS (SELECT 1 FROM dbo.Users WHERE userId = @PlatformAdminUserId)
+BEGIN
+  UPDATE dbo.Users
+  SET tenantId = NULL,
+      email = N'platform@fundnest.local',
+      passwordHash = N'$2a$10$tXLCcR6/hOinIKTraIxTz.jYjf//aqVnT0wSC18ec2eM1Mtr4cns.',
+      role = N'platform_admin'
+  WHERE userId = @PlatformAdminUserId;
+END
+ELSE
+BEGIN
+  INSERT INTO dbo.Users (userId, tenantId, email, passwordHash, role)
+  VALUES (
+    @PlatformAdminUserId,
+    NULL,
+    N'platform@fundnest.local',
+    N'$2a$10$tXLCcR6/hOinIKTraIxTz.jYjf//aqVnT0wSC18ec2eM1Mtr4cns.',
+    N'platform_admin'
   );
 END;
 

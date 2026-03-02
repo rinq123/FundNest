@@ -33,6 +33,7 @@ async function loadTenantBySlug(slug) {
         t.tenantId,
         t.slug,
         t.name,
+        t.archivedAt,
         c.brandColor,
         c.logoUrl,
         c.currency,
@@ -40,6 +41,7 @@ async function loadTenantBySlug(slug) {
       FROM dbo.Tenants t
       LEFT JOIN dbo.TenantConfig c ON c.tenantId = t.tenantId
       WHERE t.slug = @slug
+        AND t.archivedAt IS NULL
     `,
     { slug }
   );

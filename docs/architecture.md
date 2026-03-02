@@ -106,7 +106,7 @@ Operational note:
 ## Step 6: Auth and Tenant Isolation
 
 Implemented in API:
-- `POST /api/auth/login` with `tenantSlug + email + password`
+- `POST /api/auth/login` for tenant and platform login modes
 - JWT includes `tenantId`, `tenantSlug`, `role`, `email`, and `sub` (`userId`)
 - `requireAuth` middleware validates bearer token
 - `requireRole` middleware enforces role checks
@@ -194,10 +194,54 @@ API runtime updates for browser integration:
 
 Implemented in API:
 - `POST /api/platform/tenants`
-  - Guarded by `x-platform-secret` header
+  - Guarded by platform-admin access
   - Validates `name` and `slug`
   - Creates tenant row + default tenant config row
 
-Remaining work after Step 11:
+## Step 12: Tenant Lifecycle Management
+
+Implemented in API:
+- `GET /api/platform/tenants`
+  - Returns all tenants (active + archived) with counts
+- `PATCH /api/platform/tenants/:tenantId/archive`
+  - `archived: true` archives tenant
+  - `archived: false` unarchives tenant
+- `DELETE /api/platform/tenants/:tenantId`
+  - Hard-delete tenant and dependent rows through FK cascade
+
+Archive behavior:
+- Archived tenants are excluded from:
+  - `GET /api/public/tenants/:slug`
+  - `POST /api/public/donations`
+  - `POST /api/auth/login` (tenant admin login)
+- Platform admin listing still includes archived tenants for recovery/unarchive.
+
+Implemented in Web (`/`):
+- Landing page with quick links and demo credentials
+
+## Step 13: Platform Admin Login and Role-Switched Admin Console
+
+Implemented in API:
+- `POST /api/auth/login` supports:
+  - tenant mode (`loginMode=tenant`, requires `tenantSlug`, role `tenant_admin`)
+  - platform mode (`loginMode=platform`, role `platform_admin`)
+- Platform routes accept:
+  - JWT role `platform_admin` (primary path)
+  - `x-platform-secret` (legacy local fallback)
+- Seed data includes one platform admin user.
+
+Implemented in Web (`/admin`):
+- Single login form with mode selector:
+  - Tenant Admin
+  - Platform Admin
+- Role-switched dashboards:
+  - Tenant admin: existing tenant-scoped donations/config
+  - Platform admin: full tenant lifecycle management
+
+Security model update:
+- `tenant_admin` remains tenant-isolated via `tenantId` claim and query filters.
+- `platform_admin` has cross-tenant management authority on platform endpoints only.
+
+Remaining work after Step 13:
 - Production UI hardening and full Stripe Checkout/Elements UX
 - CI/CD pipeline and deployment automation

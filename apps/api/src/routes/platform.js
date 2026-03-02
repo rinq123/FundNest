@@ -1,7 +1,8 @@
 import { randomUUID } from "crypto";
 import { Router } from "express";
+import { verifyToken } from "../auth/jwt.js";
 import { env } from "../config/env.js";
-import { executeQuery, queryOne } from "../db/sql.js";
+import { executeQuery, queryMany, queryOne } from "../db/sql.js";
 
 const router = Router();
 
@@ -13,24 +14,130 @@ function isValidName(name) {
   return name.length >= 2 && name.length <= 200;
 }
 
-function requirePlatformSecret(req, res, next) {
-  if (!env.platformAdminSecret) {
-    return res.status(500).json({ error: "PLATFORM_ADMIN_SECRET is not configured" });
-  }
-
-  const providedSecret = String(req.header("x-platform-secret") ?? "");
-  if (!providedSecret) {
-    return res.status(401).json({ error: "Missing x-platform-secret header" });
-  }
-
-  if (providedSecret !== env.platformAdminSecret) {
-    return res.status(403).json({ error: "Invalid platform admin secret" });
-  }
-
-  return next();
+function isValidGuid(value) {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value);
 }
 
-router.post("/tenants", requirePlatformSecret, async (req, res) => {
+function readBearerToken(authHeader) {
+  if (!authHeader) {
+    return null;
+  }
+  const [scheme, token] = authHeader.split(" ");
+  if (scheme !== "Bearer" || !token) {
+    return null;
+  }
+  return token;
+}
+
+function requirePlatformAccess(req, res, next) {
+  const providedSecret = String(req.header("x-platform-secret") ?? "");
+  const bearerToken = readBearerToken(req.header("authorization"));
+
+  // Legacy secret-based access (for local testing/tools).
+  if (providedSecret) {
+    if (!env.platformAdminSecret) {
+      return res.status(500).json({ error: "PLATFORM_ADMIN_SECRET is not configured" });
+    }
+    if (providedSecret === env.platformAdminSecret) {
+      req.platformAccess = "secret";
+      return next();
+    }
+    if (!bearerToken) {
+      return res.status(403).json({ error: "Invalid platform admin secret" });
+    }
+  }
+
+  if (!bearerToken) {
+    return res.status(401).json({ error: "Missing platform admin credentials" });
+  }
+
+  try {
+    const claims = verifyToken(bearerToken);
+    if (claims?.role !== "platform_admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    req.auth = claims;
+    req.platformAccess = "jwt";
+    return next();
+  } catch {
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
+}
+
+function toTenantDto(row) {
+  return {
+    tenantId: row.tenantId,
+    name: row.name,
+    slug: row.slug,
+    createdAt: row.createdAt,
+    archivedAt: row.archivedAt,
+    isArchived: Boolean(row.archivedAt),
+    adminUserCount: Number(row.adminUserCount ?? 0),
+    donationCount: Number(row.donationCount ?? 0),
+    config: {
+      brandColor: row.brandColor ?? "#0f5ca8",
+      logoUrl: row.logoUrl ?? null,
+      currency: row.currency ?? "GBP",
+      donationPresets: null
+    }
+  };
+}
+
+async function loadTenantById(tenantId) {
+  return queryOne(
+    `
+      SELECT
+        t.tenantId,
+        t.name,
+        t.slug,
+        t.createdAt,
+        t.archivedAt,
+        c.brandColor,
+        c.logoUrl,
+        c.currency,
+        (SELECT COUNT(*) FROM dbo.Users u WHERE u.tenantId = t.tenantId) AS adminUserCount,
+        (SELECT COUNT(*) FROM dbo.Donations d WHERE d.tenantId = t.tenantId) AS donationCount
+      FROM dbo.Tenants t
+      LEFT JOIN dbo.TenantConfig c ON c.tenantId = t.tenantId
+      WHERE t.tenantId = @tenantId
+    `,
+    { tenantId }
+  );
+}
+
+router.use(requirePlatformAccess);
+
+router.get("/tenants", async (_req, res) => {
+  try {
+    const rows = await queryMany(
+      `
+        SELECT
+          t.tenantId,
+          t.name,
+          t.slug,
+          t.createdAt,
+          t.archivedAt,
+          c.brandColor,
+          c.logoUrl,
+          c.currency,
+          (SELECT COUNT(*) FROM dbo.Users u WHERE u.tenantId = t.tenantId) AS adminUserCount,
+          (SELECT COUNT(*) FROM dbo.Donations d WHERE d.tenantId = t.tenantId) AS donationCount
+        FROM dbo.Tenants t
+        LEFT JOIN dbo.TenantConfig c ON c.tenantId = t.tenantId
+        ORDER BY t.createdAt DESC
+      `
+    );
+
+    return res.status(200).json({
+      count: rows.length,
+      tenants: rows.map(toTenantDto)
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Tenant list failed", detail: error.message });
+  }
+});
+
+router.post("/tenants", async (req, res) => {
   try {
     const name = String(req.body?.name ?? "").trim();
     const slug = String(req.body?.slug ?? "").trim().toLowerCase();
@@ -80,19 +187,74 @@ router.post("/tenants", requirePlatformSecret, async (req, res) => {
       }
     );
 
-    return res.status(201).json({
-      tenantId,
-      name,
-      slug,
-      config: {
-        brandColor: "#0f5ca8",
-        logoUrl: null,
-        currency: "GBP",
-        donationPresets: null
-      }
-    });
+    const tenant = await loadTenantById(tenantId);
+    return res.status(201).json(toTenantDto(tenant));
   } catch (error) {
     return res.status(500).json({ error: "Tenant creation failed", detail: error.message });
+  }
+});
+
+router.patch("/tenants/:tenantId/archive", async (req, res) => {
+  try {
+    const tenantId = String(req.params.tenantId ?? "").trim();
+    const archived = req.body?.archived;
+
+    if (!isValidGuid(tenantId)) {
+      return res.status(400).json({ error: "Invalid tenantId format" });
+    }
+
+    if (typeof archived !== "boolean") {
+      return res.status(400).json({ error: "archived must be a boolean" });
+    }
+
+    const result = await executeQuery(
+      `
+        UPDATE dbo.Tenants
+        SET archivedAt = CASE
+          WHEN @archived = 1 THEN COALESCE(archivedAt, SYSUTCDATETIME())
+          ELSE NULL
+        END
+        WHERE tenantId = @tenantId
+      `,
+      { tenantId, archived: archived ? 1 : 0 }
+    );
+
+    const updated = Number(result.rowsAffected?.[0] ?? 0) > 0;
+    if (!updated) {
+      return res.status(404).json({ error: "Tenant not found" });
+    }
+
+    const tenant = await loadTenantById(tenantId);
+    return res.status(200).json(toTenantDto(tenant));
+  } catch (error) {
+    return res.status(500).json({ error: "Tenant archive update failed", detail: error.message });
+  }
+});
+
+router.delete("/tenants/:tenantId", async (req, res) => {
+  try {
+    const tenantId = String(req.params.tenantId ?? "").trim();
+
+    if (!isValidGuid(tenantId)) {
+      return res.status(400).json({ error: "Invalid tenantId format" });
+    }
+
+    const result = await executeQuery(
+      `
+        DELETE FROM dbo.Tenants
+        WHERE tenantId = @tenantId
+      `,
+      { tenantId }
+    );
+
+    const removed = Number(result.rowsAffected?.[0] ?? 0) > 0;
+    if (!removed) {
+      return res.status(404).json({ error: "Tenant not found" });
+    }
+
+    return res.status(204).send();
+  } catch (error) {
+    return res.status(500).json({ error: "Tenant deletion failed", detail: error.message });
   }
 });
 

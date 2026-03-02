@@ -15,7 +15,7 @@ Current status:
 - Admin donation/config APIs are implemented with tenant isolation
 - Stripe webhook processing is implemented
 - Frontend is integrated with live API for tenant and admin flows
-- Platform-admin tenant creation is implemented
+- Platform-admin tenant lifecycle is implemented (list/create/archive/unarchive/delete)
 
 ## Architecture
 
@@ -93,8 +93,10 @@ Notes:
 ## Seeded Demo Credentials
 
 - Tenant slug: `demo-charity`
-- Admin email: `admin@democharity.local`
-- Admin password: `DemoAdmin123!`
+- Tenant admin email: `admin@democharity.local`
+- Tenant admin password: `DemoAdmin123!`
+- Platform admin email: `platform@fundnest.local`
+- Platform admin password: `DemoPlatform123!`
 
 ## API Surface (Current)
 
@@ -107,14 +109,18 @@ Webhooks:
 
 Auth:
 - `POST /api/auth/login`
+  - Supports `loginMode=tenant` (requires `tenantSlug`) or `loginMode=platform`
 
 Tenant Admin (JWT required):
 - `GET /api/admin/me`
 - `GET /api/admin/donations`
 - `PATCH /api/admin/config`
 
-Platform Admin (header `x-platform-secret` required):
+Platform Admin (JWT `platform_admin` role required, or legacy `x-platform-secret`):
+- `GET /api/platform/tenants`
 - `POST /api/platform/tenants`
+- `PATCH /api/platform/tenants/:tenantId/archive`
+- `DELETE /api/platform/tenants/:tenantId`
 
 System:
 - `GET /api/health`
@@ -127,13 +133,25 @@ Public page (`/c/:slug`):
 - Displays PaymentIntent metadata returned by API
 
 Admin page (`/admin`):
-- Authenticates via `/api/auth/login`
-- Loads tenant dashboard from `/api/admin/me` and `/api/admin/donations`
-- Updates tenant branding/config with `/api/admin/config`
+- Single login page with role switch:
+  - Tenant admin mode
+  - Platform admin mode
+- Tenant admin dashboard:
+  - loads `/api/admin/me` and `/api/admin/donations`
+  - updates tenant branding via `/api/admin/config`
+- Platform admin dashboard:
+  - lists all tenants
+  - creates tenants
+  - archives/unarchives tenants
+  - deletes tenants
 - Stores JWT session in `localStorage`
 
 Home page (`/`):
-- Includes a platform-admin tenant creation form (calls `/api/platform/tenants`)
+- Landing + quick links + demo login credentials
+
+Archive behavior:
+- Archived tenants are not available on public routes (`/c/:slug` API data will return not found).
+- Archived tenant admins cannot log in until tenant is unarchived.
 
 ## Testing
 
@@ -161,6 +179,10 @@ docker compose up -d --build api
 ```powershell
 npm run test:api
 ```
+4. If SQL schema scripts changed, re-run DB init
+```powershell
+docker compose --profile tools run --rm db-init
+```
 
 Stop stack:
 ```powershell
@@ -175,9 +197,16 @@ Pending MVP work:
 ## End-to-End Demo Runbook
 
 1. Open `http://localhost:5173/admin` and login:
+Tenant admin demo:
+- login mode: `Tenant Admin`
 - tenant: `demo-charity`
 - email: `admin@democharity.local`
 - password: `DemoAdmin123!`
+
+Platform admin demo:
+- login mode: `Platform Admin`
+- email: `platform@fundnest.local`
+- password: `DemoPlatform123!`
 
 2. Open `http://localhost:5173/c/demo-charity` and create a donation intent.
 
