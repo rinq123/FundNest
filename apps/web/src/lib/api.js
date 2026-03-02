@@ -4,10 +4,14 @@ function buildUrl(path) {
   return `${API_BASE_URL}${path}`;
 }
 
-export async function apiRequest(path, { method = "GET", body, token } = {}) {
-  const headers = {};
+export async function apiRequest(path, { method = "GET", body, token, headers: customHeaders } = {}) {
+  const headers = { ...(customHeaders ?? {}) };
 
-  if (body !== undefined) {
+  const hasContentTypeHeader =
+    Object.prototype.hasOwnProperty.call(headers, "Content-Type") ||
+    Object.prototype.hasOwnProperty.call(headers, "content-type");
+
+  if (body !== undefined && !hasContentTypeHeader) {
     headers["Content-Type"] = "application/json";
   }
 

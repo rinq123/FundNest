@@ -132,6 +132,9 @@ Admin page (`/admin`):
 - Updates tenant branding/config with `/api/admin/config`
 - Stores JWT session in `localStorage`
 
+Home page (`/`):
+- Includes a platform-admin tenant creation form (calls `/api/platform/tenants`)
+
 ## Testing
 
 Run API tests:
