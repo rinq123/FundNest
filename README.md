@@ -75,6 +75,49 @@ docker compose --profile tools run --rm db-init
 - API health: `http://localhost:3000/api/health`
 - Web app: `http://localhost:5173`
 
+## Run Instructions (Local)
+
+First-time setup:
+```powershell
+Copy-Item .env.example .env
+docker compose up -d --build
+docker compose --profile tools run --rm db-init
+```
+
+Start or refresh services after code changes:
+```powershell
+docker compose up -d --build api web
+```
+
+Run API tests:
+```powershell
+npm run test:api
+```
+
+If SQL scripts changed, reapply schema/seed:
+```powershell
+docker compose --profile tools run --rm db-init
+```
+
+If `.env` changed and values are not reflected:
+```powershell
+docker compose up -d --force-recreate api
+```
+
+Stop services:
+```powershell
+docker compose down
+```
+
+## What This Demonstrates
+
+- Multi-tenant architecture with strict tenant isolation (`tenantId` in token claims and query filters)
+- Role-based access control (RBAC) with separate `tenant_admin` and `platform_admin` capabilities
+- End-to-end payment flow using Stripe PaymentIntents and webhook-driven status updates
+- Platform operations lifecycle (create/list/archive/unarchive/delete tenants)
+- Containerized developer workflow (Docker Compose + SQL Server + API + Vue frontend)
+- Basic validation and smoke-test coverage for critical API behavior
+
 ## Environment Variables
 
 Core values in `.env`:
