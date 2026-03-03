@@ -87,6 +87,39 @@ function slugify(value) {
     .replace(/^-+|-+$/g, "");
 }
 
+function normalizeTenantSlugInput(value) {
+  let input = String(value ?? "").trim();
+  input = input.replace(/[<>]/g, "");
+
+  if (/^https?:\/\//i.test(input)) {
+    try {
+      const url = new URL(input);
+      input = url.pathname;
+    } catch {
+      // Keep original input if URL parsing fails.
+    }
+  }
+
+  input = input.replace(/^\/+|\/+$/g, "");
+  const cPathIndex = input.toLowerCase().indexOf("c/");
+  if (cPathIndex >= 0) {
+    input = input.slice(cPathIndex + 2);
+  }
+
+  return slugify(input);
+}
+
+function normalizeEmailInput(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[<>]/g, "");
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 function setLoginMode(mode) {
   loginForm.loginMode = mode;
   authError.value = "";
@@ -324,17 +357,41 @@ async function deleteTenant(tenant) {
 
 async function login() {
   authError.value = "";
+
+  const normalizedEmail = normalizeEmailInput(loginForm.email);
+  if (!normalizedEmail || !isValidEmail(normalizedEmail)) {
+    authError.value = "Enter a valid email (example: admin@new-charity.local)";
+    return;
+  }
+
+  if (!loginForm.password) {
+    authError.value = "Password is required";
+    return;
+  }
+
+  loginForm.email = normalizedEmail;
+
+  let normalizedTenantSlug = "";
+  if (loginForm.loginMode === "tenant") {
+    normalizedTenantSlug = normalizeTenantSlugInput(loginForm.tenantSlug);
+    if (!normalizedTenantSlug) {
+      authError.value = "Enter a tenant slug (example: new-charity)";
+      return;
+    }
+    loginForm.tenantSlug = normalizedTenantSlug;
+  }
+
   loading.value = true;
 
   try {
     const payload = {
       loginMode: loginForm.loginMode,
-      email: loginForm.email,
+      email: normalizedEmail,
       password: loginForm.password
     };
 
     if (loginForm.loginMode === "tenant") {
-      payload.tenantSlug = loginForm.tenantSlug;
+      payload.tenantSlug = normalizedTenantSlug;
     }
 
     const response = await apiRequest("/api/auth/login", {
@@ -414,7 +471,7 @@ onMounted(async () => {
       <h2>Admin Console</h2>
 
       <template v-if="!session">
-        <form class="stack" @submit.prevent="login">
+        <form class="stack" novalidate @submit.prevent="login">
           <label class="stack-sm">
             <span>Login Mode</span>
             <select v-model="loginForm.loginMode" @change="setLoginMode(loginForm.loginMode)">
@@ -425,12 +482,24 @@ onMounted(async () => {
 
           <label v-if="loginForm.loginMode === 'tenant'" class="stack-sm">
             <span>Tenant Slug</span>
-            <input v-model.trim="loginForm.tenantSlug" required />
+            <input
+              v-model.trim="loginForm.tenantSlug"
+              placeholder="new-charity"
+              autocomplete="off"
+              required
+            />
+            <small class="muted">Use only the slug, not the full URL (for example: new-charity).</small>
           </label>
 
           <label class="stack-sm">
             <span>Email</span>
-            <input v-model.trim="loginForm.email" type="email" required />
+            <input
+              v-model.trim="loginForm.email"
+              type="text"
+              placeholder="admin@new-charity.local"
+              autocomplete="username"
+              required
+            />
           </label>
 
           <label class="stack-sm">
