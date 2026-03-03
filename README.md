@@ -134,19 +134,17 @@ Notes:
 - Default payment mode is `stripe` (test mode expected)
 - `demo` mode is available for offline payment-flow demos
 
-## Seeded Demo Credentials
+## Default Access
 
-- Tenant slug: `demo-charity`
-- Tenant admin email: `admin@democharity.local`
-- Tenant admin password: `DemoAdmin123!`
 - Platform admin email: `platform@fundnest.local`
 - Platform admin password: `DemoPlatform123!`
 
-For newly created tenants:
+Tenant admins are provisioned when a tenant is created:
 - A tenant admin user is created automatically.
 - Tenant admin email format: `admin@<tenant-slug>.local`
 - Default tenant admin password: `DemoAdmin123!`
 - Tenant admins can change password from the Admin Console (`/admin`) after login.
+- No tenant is seeded by default; create the first tenant from the Platform Admin dashboard.
 
 ## API Surface (Current)
 
@@ -205,7 +203,7 @@ Admin page (`/admin`):
 Home page (`/`):
 - Dynamically lists active public tenant pages using `/api/public/tenants`
 - Shows an empty-state message when no active tenants exist
-- Includes admin-console link + demo login credentials
+- Includes admin-console link
 
 Archive behavior:
 - Archived tenants are not available on public routes (`/c/:slug` API data will return not found).
@@ -258,28 +256,28 @@ Pending MVP work:
 
 ## End-to-End Demo Runbook
 
-1. Open `http://localhost:5173/admin` and login:
-Tenant admin demo:
-- login mode: `Tenant Admin`
-- tenant: `demo-charity`
-- email: `admin@democharity.local`
-- password: `DemoAdmin123!`
-
-Platform admin demo:
+1. Open `http://localhost:5173/admin` and login as platform admin:
 - login mode: `Platform Admin`
 - email: `platform@fundnest.local`
 - password: `DemoPlatform123!`
 
-2. Open `http://localhost:5173/c/demo-charity` and create a donation intent.
+2. In `Platform: Create Tenant`, create a tenant (for example `name=Save Paws`, `slug=save-paws`).
 
-3. Copy returned PaymentIntent ID (`pi_...`) and confirm via Stripe CLI:
+3. Copy the created tenant admin credentials shown in the success panel:
+- tenant slug: `<your-slug>`
+- tenant admin email: `admin@<your-slug>.local`
+- default password: `DemoAdmin123!`
+
+4. Open `http://localhost:5173/c/<your-slug>` and create a donation intent.
+
+5. Copy returned PaymentIntent ID (`pi_...`) and confirm via Stripe CLI:
 ```bash
 stripe payment_intents confirm <pi_id> --payment-method pm_card_visa
 ```
 
-4. Verify status update:
+6. Verify status update:
 - Stripe listener should show `payment_intent.succeeded` forwarded
-- Admin donations list should show the donation status as `Paid`
+- Tenant admin donations list should show the donation status as `Paid`
 
 ## Stripe Webhook (Local)
 

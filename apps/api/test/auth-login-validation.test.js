@@ -14,8 +14,8 @@ describe("Auth login validation", () => {
 
   it("requires tenantSlug for tenant login mode", async () => {
     const response = await request(app).post("/api/auth/login").send({
-      email: "admin@democharity.local",
-      password: "DemoAdmin123!"
+      email: "admin@tenant-one.local",
+      password: "ExamplePass123!"
     });
 
     expect(response.status).toBe(400);

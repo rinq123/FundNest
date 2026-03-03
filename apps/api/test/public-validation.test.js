@@ -22,7 +22,7 @@ describe("Public route validation", () => {
   it("rejects invalid amountMinor for POST /api/public/donations", async () => {
     const response = await request(app)
       .post("/api/public/donations")
-      .send({ tenantSlug: "demo-charity", amountMinor: 0 });
+      .send({ tenantSlug: "tenant-one", amountMinor: 0 });
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("amountMinor must be a positive integer in minor units");

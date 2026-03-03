@@ -121,9 +121,9 @@ describe("Platform admin route guard", () => {
     const token = signUserToken({
       userId: "88888888-8888-8888-8888-888888888888",
       tenantId: "11111111-1111-1111-1111-111111111111",
-      email: "admin@democharity.local",
+      email: "admin@tenant-one.local",
       role: "tenant_admin",
-      tenantSlug: "demo-charity"
+      tenantSlug: "tenant-one"
     });
 
     const response = await request(app)

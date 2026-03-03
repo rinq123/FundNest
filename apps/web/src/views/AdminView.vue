@@ -28,8 +28,8 @@ const selectedPlatformError = ref("");
 
 const loginForm = reactive({
   loginMode: "tenant",
-  tenantSlug: session.value?.tenantSlug ?? "demo-charity",
-  email: session.value?.email ?? "admin@democharity.local",
+  tenantSlug: session.value?.tenantSlug ?? "",
+  email: session.value?.email ?? "",
   password: ""
 });
 
@@ -94,9 +94,8 @@ function setLoginMode(mode) {
   if (mode === "platform") {
     loginForm.tenantSlug = "";
     loginForm.email = "platform@fundnest.local";
-  } else if (!loginForm.tenantSlug) {
-    loginForm.tenantSlug = "demo-charity";
-    loginForm.email = "admin@democharity.local";
+  } else if (loginForm.email === "platform@fundnest.local") {
+    loginForm.email = "";
   }
 }
 

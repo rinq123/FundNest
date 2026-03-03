@@ -7,9 +7,9 @@ describe("Tenant admin password change validation", () => {
   const token = signUserToken({
     userId: "22222222-2222-2222-2222-222222222222",
     tenantId: "11111111-1111-1111-1111-111111111111",
-    email: "admin@democharity.local",
+    email: "admin@tenant-one.local",
     role: "tenant_admin",
-    tenantSlug: "demo-charity"
+    tenantSlug: "tenant-one"
   });
 
   it("requires currentPassword and newPassword", async () => {
@@ -26,7 +26,7 @@ describe("Tenant admin password change validation", () => {
     const response = await request(app)
       .post("/api/admin/change-password")
       .set("Authorization", `Bearer ${token}`)
-      .send({ currentPassword: "DemoAdmin123!", newPassword: "short" });
+      .send({ currentPassword: "CurrentPass123!", newPassword: "short" });
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("newPassword must be between 8 and 128 characters");
@@ -36,7 +36,7 @@ describe("Tenant admin password change validation", () => {
     const response = await request(app)
       .post("/api/admin/change-password")
       .set("Authorization", `Bearer ${token}`)
-      .send({ currentPassword: "DemoAdmin123!", newPassword: "DemoAdmin123!" });
+      .send({ currentPassword: "CurrentPass123!", newPassword: "CurrentPass123!" });
 
     expect(response.status).toBe(400);
     expect(response.body.error).toBe("newPassword must be different from currentPassword");
