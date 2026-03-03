@@ -75,11 +75,7 @@ onMounted(loadPublicTenants);
     </section>
 
     <section class="card stack">
-      <h3>Demo Logins</h3>
-      <p class="muted">Tenant admin (seeded demo tenant):</p>
-      <p><code>tenantSlug: demo-charity</code></p>
-      <p><code>email: admin@democharity.local</code></p>
-      <p><code>password: DemoAdmin123!</code></p>
+      <h3>Admin Login</h3>
 
       <p class="muted">Platform admin:</p>
       <p><code>email: platform@fundnest.local</code></p>
