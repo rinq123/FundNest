@@ -18,6 +18,19 @@ function isValidGuid(value) {
   return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value);
 }
 
+function parseDonationPresets(raw) {
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 function readBearerToken(authHeader) {
   if (!authHeader) {
     return null;
@@ -78,7 +91,7 @@ function toTenantDto(row) {
       brandColor: row.brandColor ?? "#0f5ca8",
       logoUrl: row.logoUrl ?? null,
       currency: row.currency ?? "GBP",
-      donationPresets: null
+      donationPresets: parseDonationPresets(row.donationPresets)
     }
   };
 }
@@ -95,6 +108,7 @@ async function loadTenantById(tenantId) {
         c.brandColor,
         c.logoUrl,
         c.currency,
+        c.donationPresets,
         (SELECT COUNT(*) FROM dbo.Users u WHERE u.tenantId = t.tenantId) AS adminUserCount,
         (SELECT COUNT(*) FROM dbo.Donations d WHERE d.tenantId = t.tenantId) AS donationCount
       FROM dbo.Tenants t
@@ -120,6 +134,7 @@ router.get("/tenants", async (_req, res) => {
           c.brandColor,
           c.logoUrl,
           c.currency,
+          c.donationPresets,
           (SELECT COUNT(*) FROM dbo.Users u WHERE u.tenantId = t.tenantId) AS adminUserCount,
           (SELECT COUNT(*) FROM dbo.Donations d WHERE d.tenantId = t.tenantId) AS donationCount
         FROM dbo.Tenants t
@@ -191,6 +206,77 @@ router.post("/tenants", async (req, res) => {
     return res.status(201).json(toTenantDto(tenant));
   } catch (error) {
     return res.status(500).json({ error: "Tenant creation failed", detail: error.message });
+  }
+});
+
+router.get("/tenants/:tenantId", async (req, res) => {
+  try {
+    const tenantId = String(req.params.tenantId ?? "").trim();
+
+    if (!isValidGuid(tenantId)) {
+      return res.status(400).json({ error: "Invalid tenantId format" });
+    }
+
+    const tenant = await loadTenantById(tenantId);
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant not found" });
+    }
+
+    return res.status(200).json(toTenantDto(tenant));
+  } catch (error) {
+    return res.status(500).json({ error: "Tenant detail lookup failed", detail: error.message });
+  }
+});
+
+router.get("/tenants/:tenantId/donations", async (req, res) => {
+  try {
+    const tenantId = String(req.params.tenantId ?? "").trim();
+
+    if (!isValidGuid(tenantId)) {
+      return res.status(400).json({ error: "Invalid tenantId format" });
+    }
+
+    const tenant = await queryOne(
+      `
+        SELECT tenantId, slug, name, archivedAt
+        FROM dbo.Tenants
+        WHERE tenantId = @tenantId
+      `,
+      { tenantId }
+    );
+
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant not found" });
+    }
+
+    const rows = await queryMany(
+      `
+        SELECT
+          donationId,
+          tenantId,
+          amountMinor,
+          currency,
+          donorEmail,
+          status,
+          stripePaymentIntentId,
+          createdAt
+        FROM dbo.Donations
+        WHERE tenantId = @tenantId
+        ORDER BY createdAt DESC
+      `,
+      { tenantId }
+    );
+
+    return res.status(200).json({
+      tenantId: tenant.tenantId,
+      tenantSlug: tenant.slug,
+      tenantName: tenant.name,
+      isArchived: Boolean(tenant.archivedAt),
+      count: rows.length,
+      donations: rows
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Tenant donations lookup failed", detail: error.message });
   }
 });
 

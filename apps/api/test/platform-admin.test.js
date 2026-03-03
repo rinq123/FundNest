@@ -78,6 +78,24 @@ describe("Platform admin route guard", () => {
     expect(response.body.error).toBe("Invalid tenantId format");
   });
 
+  it("rejects tenant detail lookup with invalid tenantId format", async () => {
+    const response = await request(app)
+      .get("/api/platform/tenants/not-a-guid")
+      .set("x-platform-secret", env.platformAdminSecret);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Invalid tenantId format");
+  });
+
+  it("rejects tenant donations lookup with invalid tenantId format", async () => {
+    const response = await request(app)
+      .get("/api/platform/tenants/not-a-guid/donations")
+      .set("x-platform-secret", env.platformAdminSecret);
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Invalid tenantId format");
+  });
+
   it("accepts platform admin jwt and reaches validation layer", async () => {
     const token = signUserToken({
       userId: "99999999-9999-9999-9999-999999999999",

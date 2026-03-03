@@ -162,6 +162,8 @@ Tenant Admin (JWT required):
 
 Platform Admin (JWT `platform_admin` role required, or legacy `x-platform-secret`):
 - `GET /api/platform/tenants`
+- `GET /api/platform/tenants/:tenantId`
+- `GET /api/platform/tenants/:tenantId/donations`
 - `POST /api/platform/tenants`
 - `PATCH /api/platform/tenants/:tenantId/archive`
 - `DELETE /api/platform/tenants/:tenantId`
@@ -188,6 +190,7 @@ Admin page (`/admin`):
   - creates tenants
   - archives/unarchives tenants
   - deletes tenants
+  - opens an internal tenant management view with tenant details + donation history
 - Stores JWT session in `localStorage`
 
 Home page (`/`):

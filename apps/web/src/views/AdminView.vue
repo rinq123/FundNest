@@ -20,6 +20,11 @@ const platformError = ref("");
 const platformTenants = ref([]);
 const tenantActionState = reactive({});
 const tenantActionError = reactive({});
+const selectedPlatformTenantId = ref("");
+const selectedPlatformTenant = ref(null);
+const selectedPlatformDonations = ref([]);
+const selectedPlatformState = ref("idle");
+const selectedPlatformError = ref("");
 
 const loginForm = reactive({
   loginMode: "tenant",
@@ -151,10 +156,50 @@ async function loadPlatformTenants() {
   try {
     const response = await apiRequest("/api/platform/tenants", { token: token.value });
     platformTenants.value = response.tenants ?? [];
+
+    if (selectedPlatformTenantId.value) {
+      const exists = platformTenants.value.some(
+        (tenant) => tenant.tenantId === selectedPlatformTenantId.value
+      );
+      if (exists) {
+        await openPlatformTenant(selectedPlatformTenantId.value);
+      } else {
+        clearSelectedPlatformTenant();
+      }
+    }
+
     platformListState.value = "success";
   } catch (err) {
     platformListState.value = "error";
     platformError.value = err.message;
+  }
+}
+
+function clearSelectedPlatformTenant() {
+  selectedPlatformTenantId.value = "";
+  selectedPlatformTenant.value = null;
+  selectedPlatformDonations.value = [];
+  selectedPlatformState.value = "idle";
+  selectedPlatformError.value = "";
+}
+
+async function openPlatformTenant(tenantId) {
+  selectedPlatformTenantId.value = tenantId;
+  selectedPlatformState.value = "loading";
+  selectedPlatformError.value = "";
+
+  try {
+    const [tenant, donationResult] = await Promise.all([
+      apiRequest(`/api/platform/tenants/${tenantId}`, { token: token.value }),
+      apiRequest(`/api/platform/tenants/${tenantId}/donations`, { token: token.value })
+    ]);
+
+    selectedPlatformTenant.value = tenant;
+    selectedPlatformDonations.value = donationResult.donations ?? [];
+    selectedPlatformState.value = "success";
+  } catch (err) {
+    selectedPlatformState.value = "error";
+    selectedPlatformError.value = err.message;
   }
 }
 
@@ -163,7 +208,7 @@ async function createPlatformTenant() {
   createPlatformError.value = "";
 
   try {
-    await apiRequest("/api/platform/tenants", {
+    const created = await apiRequest("/api/platform/tenants", {
       method: "POST",
       token: token.value,
       body: {
@@ -173,6 +218,7 @@ async function createPlatformTenant() {
     });
     createPlatformState.value = "saved";
     await loadPlatformTenants();
+    await openPlatformTenant(created.tenantId);
   } catch (err) {
     createPlatformState.value = "error";
     createPlatformError.value = err.message;
@@ -193,6 +239,9 @@ async function toggleArchive(tenant) {
       }
     });
     await loadPlatformTenants();
+    if (selectedPlatformTenantId.value === tenant.tenantId) {
+      await openPlatformTenant(tenant.tenantId);
+    }
   } catch (err) {
     tenantActionError[key] = err.message;
   } finally {
@@ -218,6 +267,9 @@ async function deleteTenant(tenant) {
       token: token.value
     });
     await loadPlatformTenants();
+    if (selectedPlatformTenantId.value === tenant.tenantId) {
+      clearSelectedPlatformTenant();
+    }
   } catch (err) {
     tenantActionError[key] = err.message;
   } finally {
@@ -258,9 +310,11 @@ async function login() {
     if (response.user.role === "platform_admin") {
       me.value = null;
       donations.value = [];
+      clearSelectedPlatformTenant();
       await loadPlatformTenants();
     } else {
       platformTenants.value = [];
+      clearSelectedPlatformTenant();
       await loadTenantDashboard();
     }
   } catch (err) {
@@ -283,6 +337,7 @@ function logout() {
   platformListState.value = "idle";
   createPlatformState.value = "idle";
   createPlatformError.value = "";
+  clearSelectedPlatformTenant();
   loginForm.password = "";
   setLoginMode("tenant");
 }
@@ -474,12 +529,19 @@ onMounted(async () => {
               <td>{{ tenant.donationCount }}</td>
               <td>
                 <div class="actions">
+                  <button
+                    class="btn secondary btn-sm"
+                    type="button"
+                    @click="openPlatformTenant(tenant.tenantId)"
+                  >
+                    Manage
+                  </button>
                   <RouterLink
                     v-if="!tenant.isArchived"
                     class="btn secondary btn-sm"
                     :to="`/c/${tenant.slug}`"
                   >
-                    Open
+                    Public Page
                   </RouterLink>
                   <button
                     class="btn secondary btn-sm"
@@ -509,6 +571,63 @@ onMounted(async () => {
           </tbody>
         </table>
       </div>
+    </section>
+
+    <section v-if="session && isPlatformAdmin && selectedPlatformTenantId" class="card stack">
+      <div class="actions between">
+        <h3>Tenant Management: {{ selectedPlatformTenant.name }}</h3>
+        <button class="btn secondary btn-sm" type="button" @click="clearSelectedPlatformTenant">
+          Close
+        </button>
+      </div>
+
+      <p v-if="selectedPlatformState === 'loading'">Loading tenant details...</p>
+      <p v-if="selectedPlatformError" class="error">{{ selectedPlatformError }}</p>
+
+      <template v-if="selectedPlatformState === 'success'">
+        <div class="grid-2">
+          <p><strong>Tenant ID:</strong> <code>{{ selectedPlatformTenant.tenantId }}</code></p>
+          <p><strong>Slug:</strong> <code>{{ selectedPlatformTenant.slug }}</code></p>
+          <p>
+            <strong>Status:</strong>
+            <span :class="selectedPlatformTenant.isArchived ? 'status-archived' : 'status-active'">
+              {{ selectedPlatformTenant.isArchived ? "Archived" : "Active" }}
+            </span>
+          </p>
+          <p><strong>Created:</strong> {{ new Date(selectedPlatformTenant.createdAt).toLocaleString() }}</p>
+          <p><strong>Brand Color:</strong> {{ selectedPlatformTenant.config.brandColor }}</p>
+          <p><strong>Currency:</strong> {{ selectedPlatformTenant.config.currency }}</p>
+        </div>
+
+        <div class="stack-sm">
+          <h4>Donations ({{ selectedPlatformDonations.length }})</h4>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Created</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Donor</th>
+                  <th>PaymentIntent</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="donation in selectedPlatformDonations" :key="donation.donationId">
+                  <td>{{ new Date(donation.createdAt).toLocaleString() }}</td>
+                  <td>{{ formatMinor(donation.amountMinor, donation.currency) }}</td>
+                  <td>{{ donation.status }}</td>
+                  <td>{{ donation.donorEmail || "-" }}</td>
+                  <td><code>{{ donation.stripePaymentIntentId }}</code></td>
+                </tr>
+                <tr v-if="!selectedPlatformDonations.length">
+                  <td colspan="5" class="muted">No donations for this tenant yet.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
     </section>
   </section>
 </template>

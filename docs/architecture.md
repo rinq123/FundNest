@@ -203,6 +203,10 @@ Implemented in API:
 Implemented in API:
 - `GET /api/platform/tenants`
   - Returns all tenants (active + archived) with counts
+- `GET /api/platform/tenants/:tenantId`
+  - Returns one tenant's metadata + config for management view
+- `GET /api/platform/tenants/:tenantId/donations`
+  - Returns donations for selected tenant
 - `PATCH /api/platform/tenants/:tenantId/archive`
   - `archived: true` archives tenant
   - `archived: false` unarchives tenant
@@ -236,7 +240,7 @@ Implemented in Web (`/admin`):
   - Platform Admin
 - Role-switched dashboards:
   - Tenant admin: existing tenant-scoped donations/config
-  - Platform admin: full tenant lifecycle management
+  - Platform admin: full tenant lifecycle management + per-tenant detail/donation view
 
 Security model update:
 - `tenant_admin` remains tenant-isolated via `tenantId` claim and query filters.
