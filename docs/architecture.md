@@ -18,6 +18,7 @@ Roles:
 
 MVP endpoints:
 - Public:
+  - `GET /api/public/tenants`
   - `GET /api/public/tenants/:slug`
   - `POST /api/public/donations`
   - `POST /api/webhooks/stripe`
@@ -137,6 +138,8 @@ Tenant isolation enforcement:
 ## Step 8: Public Tenant and Donation APIs
 
 Implemented:
+- `GET /api/public/tenants`
+  - Lists active tenant pages for public navigation/homepage discovery
 - `GET /api/public/tenants/:slug`
   - Resolves tenant and returns tenant branding/config payload
 - `POST /api/public/donations`
@@ -213,6 +216,7 @@ Implemented in API:
   - `archived: false` unarchives tenant
 - `DELETE /api/platform/tenants/:tenantId`
   - Hard-delete tenant and dependent rows through FK cascade
+  - Guard prevents deleting the last active tenant
 
 Archive behavior:
 - Archived tenants are excluded from:
@@ -222,7 +226,9 @@ Archive behavior:
 - Platform admin listing still includes archived tenants for recovery/unarchive.
 
 Implemented in Web (`/`):
-- Landing page with quick links and demo credentials
+- Dynamic active-tenant list for public page navigation
+- Empty-state guidance when no active tenant pages exist
+- Quick links and demo credentials
 
 ## Step 13: Platform Admin Login and Role-Switched Admin Console
 

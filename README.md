@@ -151,6 +151,7 @@ For newly created tenants:
 ## API Surface (Current)
 
 Public:
+- `GET /api/public/tenants`
 - `GET /api/public/tenants/:slug`
 - `POST /api/public/donations`
 
@@ -202,11 +203,17 @@ Admin page (`/admin`):
 - Stores JWT session in `localStorage`
 
 Home page (`/`):
-- Landing + quick links + demo login credentials
+- Dynamically lists active public tenant pages using `/api/public/tenants`
+- Shows an empty-state message when no active tenants exist
+- Includes admin-console link + demo login credentials
 
 Archive behavior:
 - Archived tenants are not available on public routes (`/c/:slug` API data will return not found).
 - Archived tenant admins cannot log in until tenant is unarchived.
+
+Delete guard behavior:
+- Platform admin cannot delete the last active tenant.
+- To delete a tenant in that case, create or unarchive another active tenant first.
 
 ## Testing
 

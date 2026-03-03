@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { Router } from "express";
-import { executeQuery, queryOne } from "../db/sql.js";
+import { executeQuery, queryMany, queryOne } from "../db/sql.js";
 import { createPaymentIntent } from "../payments/provider.js";
 
 const router = Router();
@@ -46,6 +46,36 @@ async function loadTenantBySlug(slug) {
     { slug }
   );
 }
+
+router.get("/tenants", async (_req, res) => {
+  try {
+    const rows = await queryMany(
+      `
+        SELECT
+          t.tenantId,
+          t.slug,
+          t.name,
+          c.brandColor
+        FROM dbo.Tenants t
+        LEFT JOIN dbo.TenantConfig c ON c.tenantId = t.tenantId
+        WHERE t.archivedAt IS NULL
+        ORDER BY t.createdAt DESC
+      `
+    );
+
+    return res.status(200).json({
+      count: rows.length,
+      tenants: rows.map((row) => ({
+        tenantId: row.tenantId,
+        slug: row.slug,
+        name: row.name,
+        brandColor: row.brandColor ?? "#0f5ca8"
+      }))
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Tenant list lookup failed", detail: error.message });
+  }
+});
 
 router.get("/tenants/:slug", async (req, res) => {
   try {

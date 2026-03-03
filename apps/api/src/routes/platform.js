@@ -365,6 +365,37 @@ router.delete("/tenants/:tenantId", async (req, res) => {
       return res.status(400).json({ error: "Invalid tenantId format" });
     }
 
+    const tenant = await queryOne(
+      `
+        SELECT tenantId, archivedAt
+        FROM dbo.Tenants
+        WHERE tenantId = @tenantId
+      `,
+      { tenantId }
+    );
+
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant not found" });
+    }
+
+    // Keep at least one active tenant available for public demo flows.
+    if (!tenant.archivedAt) {
+      const activeCountRow = await queryOne(
+        `
+          SELECT COUNT(*) AS activeCount
+          FROM dbo.Tenants
+          WHERE archivedAt IS NULL
+        `
+      );
+
+      const activeCount = Number(activeCountRow?.activeCount ?? 0);
+      if (activeCount <= 1) {
+        return res.status(409).json({
+          error: "Cannot delete the last active tenant. Create or unarchive another tenant first."
+        });
+      }
+    }
+
     const result = await executeQuery(
       `
         DELETE FROM dbo.Tenants
