@@ -197,6 +197,7 @@ Implemented in API:
   - Guarded by platform-admin access
   - Validates `name` and `slug`
   - Creates tenant row + default tenant config row
+  - Creates default tenant admin user (`admin@<slug>.local`, password `DemoAdmin123!`)
 
 ## Step 12: Tenant Lifecycle Management
 
@@ -239,7 +240,7 @@ Implemented in Web (`/admin`):
   - Tenant Admin
   - Platform Admin
 - Role-switched dashboards:
-  - Tenant admin: existing tenant-scoped donations/config
+  - Tenant admin: existing tenant-scoped donations/config + change-password action
   - Platform admin: full tenant lifecycle management + per-tenant detail/donation view
 
 Security model update:

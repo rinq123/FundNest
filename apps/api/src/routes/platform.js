@@ -1,10 +1,12 @@
 import { randomUUID } from "crypto";
+import bcrypt from "bcryptjs";
 import { Router } from "express";
 import { verifyToken } from "../auth/jwt.js";
 import { env } from "../config/env.js";
 import { executeQuery, queryMany, queryOne } from "../db/sql.js";
 
 const router = Router();
+const DEFAULT_TENANT_ADMIN_PASSWORD = "DemoAdmin123!";
 
 function isValidSlug(slug) {
   return /^[a-z0-9-]{2,120}$/.test(slug);
@@ -86,6 +88,7 @@ function toTenantDto(row) {
     archivedAt: row.archivedAt,
     isArchived: Boolean(row.archivedAt),
     adminUserCount: Number(row.adminUserCount ?? 0),
+    tenantAdminEmail: row.tenantAdminEmail ?? null,
     donationCount: Number(row.donationCount ?? 0),
     config: {
       brandColor: row.brandColor ?? "#0f5ca8",
@@ -110,6 +113,13 @@ async function loadTenantById(tenantId) {
         c.currency,
         c.donationPresets,
         (SELECT COUNT(*) FROM dbo.Users u WHERE u.tenantId = t.tenantId) AS adminUserCount,
+        (
+          SELECT TOP 1 u.email
+          FROM dbo.Users u
+          WHERE u.tenantId = t.tenantId
+            AND u.role = 'tenant_admin'
+          ORDER BY u.createdAt ASC
+        ) AS tenantAdminEmail,
         (SELECT COUNT(*) FROM dbo.Donations d WHERE d.tenantId = t.tenantId) AS donationCount
       FROM dbo.Tenants t
       LEFT JOIN dbo.TenantConfig c ON c.tenantId = t.tenantId
@@ -136,6 +146,13 @@ router.get("/tenants", async (_req, res) => {
           c.currency,
           c.donationPresets,
           (SELECT COUNT(*) FROM dbo.Users u WHERE u.tenantId = t.tenantId) AS adminUserCount,
+          (
+            SELECT TOP 1 u.email
+            FROM dbo.Users u
+            WHERE u.tenantId = t.tenantId
+              AND u.role = 'tenant_admin'
+            ORDER BY u.createdAt ASC
+          ) AS tenantAdminEmail,
           (SELECT COUNT(*) FROM dbo.Donations d WHERE d.tenantId = t.tenantId) AS donationCount
         FROM dbo.Tenants t
         LEFT JOIN dbo.TenantConfig c ON c.tenantId = t.tenantId
@@ -179,6 +196,9 @@ router.post("/tenants", async (req, res) => {
     }
 
     const tenantId = randomUUID();
+    const tenantAdminUserId = randomUUID();
+    const tenantAdminEmail = `admin@${slug}.local`;
+    const tenantAdminPasswordHash = await bcrypt.hash(DEFAULT_TENANT_ADMIN_PASSWORD, 10);
 
     await executeQuery(
       `
@@ -202,8 +222,28 @@ router.post("/tenants", async (req, res) => {
       }
     );
 
+    await executeQuery(
+      `
+        INSERT INTO dbo.Users (userId, tenantId, email, passwordHash, role)
+        VALUES (@userId, @tenantId, @email, @passwordHash, @role)
+      `,
+      {
+        userId: tenantAdminUserId,
+        tenantId,
+        email: tenantAdminEmail,
+        passwordHash: tenantAdminPasswordHash,
+        role: "tenant_admin"
+      }
+    );
+
     const tenant = await loadTenantById(tenantId);
-    return res.status(201).json(toTenantDto(tenant));
+    return res.status(201).json({
+      ...toTenantDto(tenant),
+      tenantAdmin: {
+        email: tenantAdminEmail,
+        defaultPassword: DEFAULT_TENANT_ADMIN_PASSWORD
+      }
+    });
   } catch (error) {
     return res.status(500).json({ error: "Tenant creation failed", detail: error.message });
   }

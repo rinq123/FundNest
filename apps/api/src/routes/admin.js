@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { Router } from "express";
 import { executeQuery, queryMany, queryOne } from "../db/sql.js";
 import { requireAuth, requireRole, requireTenantScope } from "../middleware/auth.js";
@@ -208,5 +209,76 @@ router.patch("/config", requireAuth, requireRole("tenant_admin"), requireTenantS
     return res.status(500).json({ error: "Tenant config update failed", detail: error.message });
   }
 });
+
+router.post(
+  "/change-password",
+  requireAuth,
+  requireRole("tenant_admin"),
+  requireTenantScope,
+  async (req, res) => {
+    try {
+      const currentPassword = String(req.body?.currentPassword ?? "");
+      const newPassword = String(req.body?.newPassword ?? "");
+
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "currentPassword and newPassword are required" });
+      }
+
+      if (newPassword.length < 8 || newPassword.length > 128) {
+        return res.status(400).json({ error: "newPassword must be between 8 and 128 characters" });
+      }
+
+      if (currentPassword === newPassword) {
+        return res
+          .status(400)
+          .json({ error: "newPassword must be different from currentPassword" });
+      }
+
+      const user = await queryOne(
+        `
+          SELECT userId, tenantId, passwordHash
+          FROM dbo.Users
+          WHERE userId = @userId
+            AND tenantId = @tenantId
+            AND role = 'tenant_admin'
+        `,
+        {
+          userId: req.auth.sub,
+          tenantId: req.tenantId
+        }
+      );
+
+      if (!user) {
+        return res.status(404).json({ error: "Tenant admin user not found" });
+      }
+
+      const passwordMatches = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!passwordMatches) {
+        return res.status(400).json({ error: "Current password is incorrect" });
+      }
+
+      const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+      await executeQuery(
+        `
+          UPDATE dbo.Users
+          SET passwordHash = @passwordHash
+          WHERE userId = @userId
+            AND tenantId = @tenantId
+            AND role = 'tenant_admin'
+        `,
+        {
+          userId: req.auth.sub,
+          tenantId: req.tenantId,
+          passwordHash: newPasswordHash
+        }
+      );
+
+      return res.status(200).json({ updated: true });
+    } catch (error) {
+      return res.status(500).json({ error: "Password change failed", detail: error.message });
+    }
+  }
+);
 
 export default router;

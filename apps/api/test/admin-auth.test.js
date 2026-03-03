@@ -27,4 +27,13 @@ describe("Admin routes auth guard", () => {
     expect(response.status).toBe(401);
     expect(response.body.error).toBe("Invalid or expired token");
     });
+
+  it("rejects POST /api/admin/change-password without token", async () => {
+    const response = await request(app)
+      .post("/api/admin/change-password")
+      .send({ currentPassword: "DemoAdmin123!", newPassword: "NewStrongPassword123!" });
+
+    expect(response.status).toBe(401);
+    expect(response.body.error).toBe("Missing or invalid Authorization header");
+  });
 });

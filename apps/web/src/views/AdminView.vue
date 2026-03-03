@@ -39,6 +39,13 @@ const tenantConfigForm = reactive({
   currency: "GBP",
   donationPresetsText: "500,1000,2000,5000"
 });
+const changePasswordForm = reactive({
+  currentPassword: "",
+  newPassword: "",
+  confirmPassword: ""
+});
+const changePasswordState = ref("idle");
+const changePasswordError = ref("");
 
 const platformCreateForm = reactive({
   name: "New Charity",
@@ -47,6 +54,7 @@ const platformCreateForm = reactive({
 
 const createPlatformState = ref("idle");
 const createPlatformError = ref("");
+const createdTenantAdminInfo = ref(null);
 
 const token = computed(() => session.value?.accessToken ?? "");
 const role = computed(() => session.value?.role ?? "");
@@ -145,6 +153,36 @@ async function saveTenantConfig() {
   }
 }
 
+async function changeTenantPassword() {
+  changePasswordState.value = "saving";
+  changePasswordError.value = "";
+
+  if (changePasswordForm.newPassword !== changePasswordForm.confirmPassword) {
+    changePasswordState.value = "error";
+    changePasswordError.value = "New password and confirm password must match";
+    return;
+  }
+
+  try {
+    await apiRequest("/api/admin/change-password", {
+      method: "POST",
+      token: token.value,
+      body: {
+        currentPassword: changePasswordForm.currentPassword,
+        newPassword: changePasswordForm.newPassword
+      }
+    });
+
+    changePasswordState.value = "saved";
+    changePasswordForm.currentPassword = "";
+    changePasswordForm.newPassword = "";
+    changePasswordForm.confirmPassword = "";
+  } catch (err) {
+    changePasswordState.value = "error";
+    changePasswordError.value = err.message;
+  }
+}
+
 async function loadPlatformTenants() {
   if (!token.value || !isPlatformAdmin.value) {
     return;
@@ -206,6 +244,7 @@ async function openPlatformTenant(tenantId) {
 async function createPlatformTenant() {
   createPlatformState.value = "saving";
   createPlatformError.value = "";
+  createdTenantAdminInfo.value = null;
 
   try {
     const created = await apiRequest("/api/platform/tenants", {
@@ -216,6 +255,13 @@ async function createPlatformTenant() {
         slug: slugify(platformCreateForm.slug)
       }
     });
+
+    createdTenantAdminInfo.value = {
+      slug: created.slug,
+      email: created.tenantAdmin?.email ?? null,
+      defaultPassword: created.tenantAdmin?.defaultPassword ?? "DemoAdmin123!"
+    };
+
     createPlatformState.value = "saved";
     await loadPlatformTenants();
     await openPlatformTenant(created.tenantId);
@@ -332,11 +378,17 @@ function logout() {
   dashboardError.value = "";
   saveConfigState.value = "idle";
   saveConfigError.value = "";
+  changePasswordState.value = "idle";
+  changePasswordError.value = "";
+  changePasswordForm.currentPassword = "";
+  changePasswordForm.newPassword = "";
+  changePasswordForm.confirmPassword = "";
   platformTenants.value = [];
   platformError.value = "";
   platformListState.value = "idle";
   createPlatformState.value = "idle";
   createPlatformError.value = "";
+  createdTenantAdminInfo.value = null;
   clearSelectedPlatformTenant();
   loginForm.password = "";
   setLoginMode("tenant");
@@ -445,6 +497,30 @@ onMounted(async () => {
     </section>
 
     <section v-if="session && isTenantAdmin && me" class="card stack">
+      <h3>Change Password</h3>
+      <form class="stack" @submit.prevent="changeTenantPassword">
+        <label class="stack-sm">
+          <span>Current Password</span>
+          <input v-model="changePasswordForm.currentPassword" type="password" required />
+        </label>
+        <label class="stack-sm">
+          <span>New Password</span>
+          <input v-model="changePasswordForm.newPassword" type="password" required />
+        </label>
+        <label class="stack-sm">
+          <span>Confirm New Password</span>
+          <input v-model="changePasswordForm.confirmPassword" type="password" required />
+        </label>
+
+        <button class="btn" type="submit" :disabled="changePasswordState === 'saving'">
+          {{ changePasswordState === "saving" ? "Updating..." : "Update Password" }}
+        </button>
+      </form>
+      <p v-if="changePasswordState === 'saved'" class="success">Password updated.</p>
+      <p v-if="changePasswordError" class="error">{{ changePasswordError }}</p>
+    </section>
+
+    <section v-if="session && isTenantAdmin && me" class="card stack">
       <h3>Recent Donations</h3>
 
       <div class="table-wrap">
@@ -473,6 +549,10 @@ onMounted(async () => {
 
     <section v-if="session && isPlatformAdmin" class="card stack">
       <h3>Platform: Create Tenant</h3>
+      <p class="muted">
+        New tenants are created with a default tenant-admin user. Default password:
+        <code>DemoAdmin123!</code>
+      </p>
       <form class="stack" @submit.prevent="createPlatformTenant">
         <div class="grid-2">
           <label class="stack-sm">
@@ -490,6 +570,11 @@ onMounted(async () => {
       </form>
       <p v-if="createPlatformState === 'saved'" class="success">Tenant created.</p>
       <p v-if="createPlatformError" class="error">{{ createPlatformError }}</p>
+      <div v-if="createdTenantAdminInfo" class="panel stack-sm">
+        <p><strong>New tenant slug:</strong> <code>{{ createdTenantAdminInfo.slug }}</code></p>
+        <p><strong>Tenant admin email:</strong> <code>{{ createdTenantAdminInfo.email }}</code></p>
+        <p><strong>Default password:</strong> <code>{{ createdTenantAdminInfo.defaultPassword }}</code></p>
+      </div>
     </section>
 
     <section v-if="session && isPlatformAdmin" class="card stack">
@@ -575,7 +660,7 @@ onMounted(async () => {
 
     <section v-if="session && isPlatformAdmin && selectedPlatformTenantId" class="card stack">
       <div class="actions between">
-        <h3>Tenant Management: {{ selectedPlatformTenant.name }}</h3>
+        <h3>Tenant Management: {{ selectedPlatformTenant?.name ?? selectedPlatformTenantId }}</h3>
         <button class="btn secondary btn-sm" type="button" @click="clearSelectedPlatformTenant">
           Close
         </button>
@@ -595,6 +680,7 @@ onMounted(async () => {
             </span>
           </p>
           <p><strong>Created:</strong> {{ new Date(selectedPlatformTenant.createdAt).toLocaleString() }}</p>
+          <p><strong>Tenant Admin Email:</strong> {{ selectedPlatformTenant.tenantAdminEmail || "-" }}</p>
           <p><strong>Brand Color:</strong> {{ selectedPlatformTenant.config.brandColor }}</p>
           <p><strong>Currency:</strong> {{ selectedPlatformTenant.config.currency }}</p>
         </div>

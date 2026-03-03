@@ -142,6 +142,12 @@ Notes:
 - Platform admin email: `platform@fundnest.local`
 - Platform admin password: `DemoPlatform123!`
 
+For newly created tenants:
+- A tenant admin user is created automatically.
+- Tenant admin email format: `admin@<tenant-slug>.local`
+- Default tenant admin password: `DemoAdmin123!`
+- Tenant admins can change password from the Admin Console (`/admin`) after login.
+
 ## API Surface (Current)
 
 Public:
@@ -159,6 +165,7 @@ Tenant Admin (JWT required):
 - `GET /api/admin/me`
 - `GET /api/admin/donations`
 - `PATCH /api/admin/config`
+- `POST /api/admin/change-password`
 
 Platform Admin (JWT `platform_admin` role required, or legacy `x-platform-secret`):
 - `GET /api/platform/tenants`
@@ -185,6 +192,7 @@ Admin page (`/admin`):
 - Tenant admin dashboard:
   - loads `/api/admin/me` and `/api/admin/donations`
   - updates tenant branding via `/api/admin/config`
+  - allows tenant admin password changes via `/api/admin/change-password`
 - Platform admin dashboard:
   - lists all tenants
   - creates tenants
