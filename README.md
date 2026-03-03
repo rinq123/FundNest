@@ -17,6 +17,11 @@ Current status:
 - Frontend is integrated with live API for tenant and admin flows
 - Platform-admin tenant lifecycle is implemented (list/create/archive/unarchive/delete)
 
+## Demo
+
+![FundNest demo](docs/media/fundnest-demo.gif)
+
+
 ## Architecture
 
 - Frontend: Vue 3 + Vue Router (`apps/web`)
